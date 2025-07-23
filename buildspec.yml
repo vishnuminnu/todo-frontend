@@ -3,28 +3,37 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      nodejs: 16
+      nodejs: 18  # Updated to Node.js 18 (LTS)
     commands:
-      - echo Installing dependencies...
-      - npm install
+      - echo "Installing dependencies..."
+      - npm install --legacy-peer-deps  # Workaround for peer dependency issues
+      - npm audit fix --force  # Auto-fix vulnerabilities
+
   pre_build:
     commands:
-      - echo Running tests...
-      - npm test
+      - echo "Running tests..."
+      - CI=true npm test  # Force test execution in CI mode
+
   build:
     commands:
-      - echo Building application...
+      - echo "Building React app..."
       - npm run build
+
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo Pushing Docker image to ECR...
-      - $(aws ecr get-login --no-include-email)
-      - docker build -t react-frontend .
-      - docker tag react-frontend:101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:latest
-      - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:latest
+      - echo "Build completed on $(date)"
+      - echo "Logging into ECR..."
+      - aws ecr get-login-password | docker login --username AWS --password-stdin 101861531743.dkr.ecr.us-east-1.amazonaws.com
+      - echo "Building Docker image..."
+      - docker build -t todo-frontend .
+      - echo "Tagging and pushing to ECR..."
+      - docker tag todo-frontend:latest 101861531743.dkr.ecr.us-east-1.amazonaws.com/todo-frontend:latest
+      - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/todo-frontend:latest
+
+cache:
+  paths:
+    - node_modules/**/*  # Cache to speed up future builds
 
 artifacts:
   files:
-    - '**/*'
-  base-directory: 'build'
+    - 'build/**/*'  # Only needed if you want to archive build output
