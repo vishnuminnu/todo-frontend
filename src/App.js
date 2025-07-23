@@ -9,7 +9,7 @@ function App() {
 
   const fetchTodos = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/todos');
+      const response = await fetch('http://3.239.225.227:5000/api/todos');
       const data = await response.json();
       setTodos(data);
     } catch (error) {
