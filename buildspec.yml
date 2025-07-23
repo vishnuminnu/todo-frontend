@@ -23,6 +23,6 @@ phases:
       - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG
       - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:latest
       - echo Writing image definitions file...
-      - printf '[{"name":"frontend-container","imageUri":"%s"}]' 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"name":"react-frontend","imageUri":"%s"}]' 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG > imagedefinitions.json
 artifacts:
   files: imagedefinitions.json
