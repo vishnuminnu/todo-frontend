@@ -21,7 +21,7 @@ function App() {
     if (!task.trim()) return;
     
     try {
-      const response = await fetch('http://localhost:5000/api/todos', {
+      const response = await fetch('http://3.239.225.227:5000/api/todos', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +38,7 @@ function App() {
 
   const toggleComplete = async (id, currentStatus) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/todos/${id}`, {
+      const response = await fetch(`http://3.239.225.227:5000/api/todos/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ function App() {
 
   const deleteTodo = async (id) => {
     try {
-      await fetch(`http://localhost:5000/api/todos/${id}`, {
+      await fetch(`http://3.239.225.227:5000/api/todos/${id}`, {
         method: 'DELETE',
       });
       setTodos(todos.filter(todo => todo._id !== id));
