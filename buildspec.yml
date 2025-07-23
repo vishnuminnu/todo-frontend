@@ -1,29 +1,36 @@
 version: 0.2
 
+env:
+  variables:
+    CI: "true"  # Force CI mode for all commands
+
 phases:
   install:
     runtime-versions:
-      nodejs: 18  # Updated to Node.js 18 (LTS)
+      nodejs: 18  # Updated to Node.js 18 LTS
     commands:
       - echo "Installing dependencies..."
-      - npm install --legacy-peer-deps  # Workaround for peer dependency issues
-      - npm audit fix --force  # Auto-fix vulnerabilities
+      - npm install --legacy-peer-deps  # Bypass peer dependency conflicts
+      - npm audit fix  # Fix non-breaking vulnerabilities
+      - if [ ! -d "node_modules/react-scripts" ]; then npm install react-scripts@5.0.1; fi  # Safety net
 
   pre_build:
     commands:
       - echo "Running tests..."
-      - CI=true npm test  # Force test execution in CI mode
+      - npm test  # Already runs in CI mode due to env variable
 
   build:
     commands:
       - echo "Building React app..."
       - npm run build
+      - echo "Build size:"
+      - du -sh build/
 
   post_build:
     commands:
       - echo "Build completed on $(date)"
       - echo "Logging into ECR..."
-      - aws ecr get-login-password | docker login --username AWS --password-stdin 101861531743.dkr.ecr.us-east-1.amazonaws.com
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 101861531743.dkr.ecr.us-east-1.amazonaws.com
       - echo "Building Docker image..."
       - docker build -t todo-frontend .
       - echo "Tagging and pushing to ECR..."
@@ -32,8 +39,10 @@ phases:
 
 cache:
   paths:
-    - node_modules/**/*  # Cache to speed up future builds
+    - 'node_modules/**/*'  # Cache dependencies between builds
 
 artifacts:
   files:
-    - 'build/**/*'  # Only needed if you want to archive build output
+    - 'build/**/*'  # Archive build output
+  discard-paths: no
+  base-directory: 'build'
