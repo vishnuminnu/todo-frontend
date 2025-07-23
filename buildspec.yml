@@ -1,47 +1,28 @@
 version: 0.2
 
-env:
-  variables:
-    CI: "true"
-    NODE_OPTIONS: "--openssl-legacy-provider"
-    SKIP_PREFLIGHT_CHECK: "true"
-
 phases:
-  install:
-    runtime-versions:
-      nodejs: 18
-    commands:
-      - echo "Installing secure dependencies..."
-      # Install specific secure versions first
-      - npm install --legacy-peer-deps --save-exact postcss@8.4.31 webpack-dev-server@4.15.1 @svgr/webpack@6.5.1
-      # Install remaining dependencies
-      - npm install --legacy-peer-deps
-      # Verify critical dependencies
-      - if [ ! -f "node_modules/.bin/react-scripts" ]; then npm install react-scripts@5.0.1; fi
-
   pre_build:
     commands:
-      - echo "Running security checks..."
-      - npm audit --production --audit-level=critical || true
-      - echo "Updating test cases..."
-      - sed -i 's/learn react/Add a new task/g' src/App.test.js || echo "Test update skipped"
-      - echo "Running tests..."
-      - npm test -- --watchAll=false
-
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 101861531743.dkr.ecr.us-east-1.amazonaws.com
+      - echo Checking for existing frontend repository...
+      - aws ecr describe-repositories --repository-names react-frontend || aws ecr create-repository --repository-name react-frontend
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
   build:
     commands:
-      - echo "Building application..."
-      - npm run build
-
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG .
+      - docker tag 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:latest
   post_build:
     commands:
-      - echo "Build completed at $(date)"
-      - echo "Pushing to ECR..."
-      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
-      - docker build -t $IMAGE_NAME .
-      - docker tag $IMAGE_NAME:latest $ECR_URI/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER
-      - docker push $ECR_URI/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER
-
-cache:
-  paths:
-    - 'node_modules/**/*'
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG
+      - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:latest
+      - echo Writing image definitions file...
+      - printf '[{"name":"frontend-container","imageUri":"%s"}]' 101861531743.dkr.ecr.us-east-1.amazonaws.com/react-frontend:$IMAGE_TAG > imagedefinitions.json
+artifacts:
+  files: imagedefinitions.json
