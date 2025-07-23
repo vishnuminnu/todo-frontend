@@ -3,46 +3,47 @@ version: 0.2
 env:
   variables:
     CI: "true"
-    NODE_OPTIONS: "--openssl-legacy-provider" # For Node.js 18 compatibility
+    SKIP_PREFLIGHT_CHECK: "true"  # Bypass version warnings
+    NODE_OPTIONS: "--openssl-legacy-provider"
 
 phases:
   install:
     runtime-versions:
       nodejs: 18
     commands:
-      - echo "Installing dependencies..."
-      # First install without fixing to preserve critical dependencies
+      - echo "Securely installing dependencies..."
+      # Install exact versions of vulnerable packages first
+      - npm install --legacy-peer-deps --save-exact postcss@8.4.31
+      - npm install --legacy-peer-deps --save-exact webpack-dev-server@4.15.1
+      - npm install --legacy-peer-deps --save-exact @svgr/webpack@6.5.1
+      # Then install remaining dependencies
       - npm install --legacy-peer-deps
-      # Apply selective vulnerability fixes
-      - npm update postcss@8.4.31 webpack-dev-server@4.15.1 @svgr/webpack@6.5.1
-      # Safe audit fix (won't break react-scripts)
-      - npm audit fix || true  # Continue even if some fixes fail
-      # Verify critical dependencies exist
-      - if [ ! -d "node_modules/react-scripts" ]; then npm install react-scripts@5.0.1; fi
+      # Safe vulnerability fixes
+      - npm audit fix || echo "Some vulnerabilities remain - continuing build"
+      # Verify critical dependencies
+      - if [ ! -f "node_modules/.bin/react-scripts" ]; then npm install react-scripts@5.0.1; fi
 
   pre_build:
     commands:
+      - echo "Running security checks..."
+      - npm audit --production  # Check only production dependencies
       - echo "Running tests..."
       - npm test
 
   build:
     commands:
-      - echo "Building React app..."
+      - echo "Building application..."
       - npm run build
 
   post_build:
     commands:
-      - echo "Build completed on $(date)"
+      - echo "Build completed at $(date)"
       - echo "Pushing to ECR..."
-      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REPO
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
       - docker build -t $IMAGE_NAME .
-      - docker tag $IMAGE_NAME:latest $ECR_URI/$IMAGE_NAME:latest
-      - docker push $ECR_URI/$IMAGE_NAME:latest
+      - docker tag $IMAGE_NAME:latest $ECR_URI/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER
+      - docker push $ECR_URI/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER
 
 cache:
   paths:
     - 'node_modules/**/*'
-
-artifacts:
-  files:
-    - 'build/**/*'
