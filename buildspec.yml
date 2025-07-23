@@ -2,47 +2,47 @@ version: 0.2
 
 env:
   variables:
-    CI: "true"  # Force CI mode for all commands
+    CI: "true"
+    NODE_OPTIONS: "--openssl-legacy-provider" # For Node.js 18 compatibility
 
 phases:
   install:
     runtime-versions:
-      nodejs: 18  # Updated to Node.js 18 LTS
+      nodejs: 18
     commands:
       - echo "Installing dependencies..."
-      - npm install --legacy-peer-deps  # Bypass peer dependency conflicts
-      - npm audit fix  # Fix non-breaking vulnerabilities
-      - if [ ! -d "node_modules/react-scripts" ]; then npm install react-scripts@5.0.1; fi  # Safety net
+      # First install without fixing to preserve critical dependencies
+      - npm install --legacy-peer-deps
+      # Apply selective vulnerability fixes
+      - npm update postcss@8.4.31 webpack-dev-server@4.15.1 @svgr/webpack@6.5.1
+      # Safe audit fix (won't break react-scripts)
+      - npm audit fix || true  # Continue even if some fixes fail
+      # Verify critical dependencies exist
+      - if [ ! -d "node_modules/react-scripts" ]; then npm install react-scripts@5.0.1; fi
 
   pre_build:
     commands:
       - echo "Running tests..."
-      - npm test  # Already runs in CI mode due to env variable
+      - npm test
 
   build:
     commands:
       - echo "Building React app..."
       - npm run build
-      - echo "Build size:"
-      - du -sh build/
 
   post_build:
     commands:
       - echo "Build completed on $(date)"
-      - echo "Logging into ECR..."
-      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 101861531743.dkr.ecr.us-east-1.amazonaws.com
-      - echo "Building Docker image..."
-      - docker build -t todo-frontend .
-      - echo "Tagging and pushing to ECR..."
-      - docker tag todo-frontend:latest 101861531743.dkr.ecr.us-east-1.amazonaws.com/todo-frontend:latest
-      - docker push 101861531743.dkr.ecr.us-east-1.amazonaws.com/todo-frontend:latest
+      - echo "Pushing to ECR..."
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REPO
+      - docker build -t $IMAGE_NAME .
+      - docker tag $IMAGE_NAME:latest $ECR_URI/$IMAGE_NAME:latest
+      - docker push $ECR_URI/$IMAGE_NAME:latest
 
 cache:
   paths:
-    - 'node_modules/**/*'  # Cache dependencies between builds
+    - 'node_modules/**/*'
 
 artifacts:
   files:
-    - 'build/**/*'  # Archive build output
-  discard-paths: no
-  base-directory: 'build'
+    - 'build/**/*'
